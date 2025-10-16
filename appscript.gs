@@ -1,6 +1,6 @@
 /***** CONFIG (edit these) *****/
-const TEMPLATE_DOC_ID = '1xvRxNEhjDrUFhsKehL1Uy7Z0yov0003HmG44jqCICwg';
-const OUTPUT_DOC_FOLDER_ID = '1UF6VuW6GivJl3Kv3HoTdis44-TU3qF0u';
+const TEMPLATE_DOC_ID = 'copy_unique_ID from_template_url';
+const OUTPUT_DOC_FOLDER_ID = 'copy_unique_ID from_drive_url';
 const GEMINI_API_PROP_KEY = 'GEMINI_API_KEY';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
