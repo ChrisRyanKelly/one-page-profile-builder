@@ -33,22 +33,22 @@ This approach streamlines the process, saves staff time, and ensures every profi
 
 1. Enter student responses directly into a **Google Form**.
     
-    *Screenshot: Example of Google Form used during student interview.*
+   <img src="https://github.com/ChrisRyanKelly/one-page-profile-builder/blob/master/public/assets/form.png" width="600" alt="Goolge-Form" />
     
 2. Responses are captured automatically in a **Google Sheet**.
     
-    *Screenshot: Example of Sheet capturing responses.*
+   <img src="https://github.com/ChrisRyanKelly/one-page-profile-builder/blob/master/public/assets/form-responses.png" width="600" alt="Form-Responses" />
     
 3. An **Apps Script trigger** processes each submission:
     - Calls **Gemini** to polish responses into clear, professional UK English
     - Generates a draft **Google Doc** from a standardised template
     - Saves a ready-to-edit draft in **Google Drive** for staff QA
-        
-        *Screenshot: Example of generated Doc and Drive folder.*
+
+   <img src="https://github.com/ChrisRyanKelly/one-page-profile-builder/blob/master/public/assets/drive.png" width="600" alt="Google-Drive" />
         
 4. Export the reviewed document as **PDF** or **Word** and upload to **Microsoft Teams**.
     
-    *Screenshot: Example of download/export options.*
+   <img src="https://github.com/ChrisRyanKelly/one-page-profile-builder/blob/master/public/assets/doc-export.png" width="600" alt="Google-Doc-Export" />
     
 
 ---
