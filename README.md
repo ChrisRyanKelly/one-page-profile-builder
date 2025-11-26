@@ -1,5 +1,3 @@
-# One Page Profile Builder (Apps Script × Gemini)
-
 **An intelligent automation tool designed to streamline One Page Profile creation, reduce duplication, and improve consistency across staff.**
 
 ---
