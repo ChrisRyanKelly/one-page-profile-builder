@@ -5,22 +5,22 @@ const GEMINI_API_PROP_KEY = 'GEMINI_API_KEY';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const MODEL_CANDIDATES = [
-  'models/gemini-2.0-flash',
   'models/gemini-2.5-flash',
+  'models/gemini-2.0-flash',
   'models/gemini-2.5-pro'
 ];
 
 const REDACT_NAMES = true;          // Mask StudentName inside prompts
 const MAX_OUTPUT_TOKENS = 256;      // Keep small for reliability
 const CANONICALISE_SUPPORT = false; // Preserve personalised support from the model
-const LOCK_WAIT_MS = 5000;          // Faster response for low-concurrency schools
-const AUTO_EXPORT_PDF = true;       // Save PDF copy beside generated Doc
 const EMAIL_STAFF_ON_CREATE = true; // Email QA staff when files are created
 const QA_EMAIL = 'staff.member@school.org';
 const EMAIL_USE_NOREPLY = true;
 /***** END CONFIG *****/
 
-const EXPECTED_KEYS = ['StudentName','YearGroup','AboutMe','IWishMyTeacherKnew','HowToSupportMe','ProfileDate'];
+const EXPECTED_KEYS = [
+  'StudentName','YearGroup','AboutMe','IWishMyTeacherKnew','HowToSupportMe','ProfileDate'
+];
 
 const TARGET_SUPPORT = [
   'Give brief written and verbal instructions; highlight the key steps/success criteria.',
@@ -44,7 +44,7 @@ function createOnFormSubmitTrigger() {
 /** === Main: on form submission, make a Doc with AI-summarised content === **/
 function onFormSubmit(e) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(LOCK_WAIT_MS); // serialize bursts a bit; keep it short
+  lock.waitLock(15000); // serialize bursts a bit; keep it short
   try {
     if (!e) throw new Error('Missing event object. Use an installable spreadsheet trigger.');
     const tz = Session.getScriptTimeZone();
@@ -67,7 +67,7 @@ function onFormSubmit(e) {
       throw new Error('Event object has neither range nor namedValues.');
     }
 
-    // Map data by key + sensible alias fallback
+    // Map data by normalised keys
     const toKey = s => String(s).replace(/[^\p{L}\p{N}_]/gu, '').trim();
     const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const clean = v => {
@@ -84,7 +84,6 @@ function onFormSubmit(e) {
       seen.set(k, i);
       data[k] = values[i] == null ? '' : String(values[i]);
     });
-    normaliseExpectedKeys_(data);
     data['ProfileDate'] = profileDate;
 
     // Pull original fields
@@ -147,13 +146,7 @@ function onFormSubmit(e) {
     EXPECTED_KEYS.forEach(k => body.replaceText(`\\{\\{${escRe(k)}\\}\\}`, '—')); // ensure no {{Missing}}
     doc.saveAndClose();
 
-    if (AUTO_EXPORT_PDF) {
-      const pdfBlob = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(`${baseName}.pdf`);
-      parentFolder.createFile(pdfBlob);
-    }
-
     if (EMAIL_STAFF_ON_CREATE && QA_EMAIL) {
-      const pdfName = `${baseName}.pdf`;
       const folderUrl = parentFolder.getUrl();
       MailApp.sendEmail({
         to: QA_EMAIL,
@@ -163,7 +156,7 @@ function onFormSubmit(e) {
            <p><strong>Student:</strong> ${safeStudentName}<br/>
            <strong>Google Doc:</strong> <a href="${doc.getUrl()}">${baseName}</a><br/>
            <strong>Drive folder:</strong> <a href="${folderUrl}">Open folder</a><br/>
-           <strong>PDF:</strong> ${AUTO_EXPORT_PDF ? `Saved as <em>${pdfName}</em> in the same folder.` : 'Not generated.'}</p>`,
+           <strong>PDF:</strong> Not generated.</p>`,
         noReply: EMAIL_USE_NOREPLY
       });
     }
@@ -389,20 +382,6 @@ function dedupeKeepOrder_(arr) {
     const k = t.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(t); }
   }
   return out;
-}
-function normaliseExpectedKeys_(data) {
-  const ALIASES = {
-    StudentName: ['StudentName', 'Student', 'StudentFullName', 'FullName'],
-    YearGroup: ['YearGroup', 'Year', 'Class', 'TutorGroup'],
-    AboutMe: ['AboutMe', 'AboutMeTellUsAboutYourself'],
-    IWishMyTeacherKnew: ['IWishMyTeacherKnew', 'IWishMyTeacherKnewThat'],
-    HowToSupportMe: ['HowToSupportMe', 'HowCanTeachersSupportMe']
-  };
-  EXPECTED_KEYS.forEach(key => {
-    if (String(data[key] || '').trim()) return;
-    const firstMatch = (ALIASES[key] || []).find(alias => String(data[alias] || '').trim());
-    if (firstMatch) data[key] = data[firstMatch];
-  });
 }
 function getApiKey_() {
   const key = PropertiesService.getScriptProperties().getProperty(GEMINI_API_PROP_KEY);
