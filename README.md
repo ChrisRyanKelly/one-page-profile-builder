@@ -19,10 +19,12 @@ This approach streamlines the process, saves staff time, and ensures every profi
 ## Key Features
 
 - Automated AI-powered text generation using **Gemini**
+- Fast-first model routing (`gemini-2.0-flash` first, with resilient fallback)
 - Customisable **Google Docs** template for consistent formatting
 - Secure data handling with automatic name redaction
 - Built-in fallback for AI downtime to ensure reliability
-- One-click export to **PDF** or **Word** for upload to **Microsoft Teams**
+- Automatic PDF copy saved alongside each generated Google Doc
+- Optional staff email notification with direct review links
 - Fully digital workflow that eliminates paper waste
 
 ---
@@ -41,6 +43,8 @@ This approach streamlines the process, saves staff time, and ensures every profi
     - Calls **Gemini** to polish responses into clear, professional UK English
     - Generates a draft **Google Doc** from a standardised template
     - Saves a ready-to-edit draft in **Google Drive** for staff QA
+    - Exports a PDF copy automatically in the same folder
+    - Optionally emails staff a direct link to the finished draft
 
    <img src="https://github.com/ChrisRyanKelly/one-page-profile-builder/blob/master/public/assets/drive.png" width="600" alt="Google-Drive" />
         
@@ -65,12 +69,16 @@ The system has been designed with clear guardrails to ensure privacy, reliabilit
 const TEMPLATE_DOC_ID = '...';       // Google Doc template
 const OUTPUT_DOC_FOLDER_ID = '...';  // Folder for generated profiles
 const GEMINI_API_PROP_KEY = 'GEMINI_API_KEY'; // API key stored in script properties
+const LOCK_WAIT_MS = 5000;           // Trigger lock timeout
+const AUTO_EXPORT_PDF = true;        // Save PDF beside each doc
+const EMAIL_STAFF_ON_CREATE = true;  // Email staff links when an email field is present
 ```
 
 ### Setup
 
 1. **Google Workspace**
     - Create a **Google Form** for staff to complete.
+    - Include a staff email field if you want automatic notifications.
     - Link it to a **Google Sheet**.
 2. **Apps Script**
     - Add the provided script to the **Google Sheet**.
