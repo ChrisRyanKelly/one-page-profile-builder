@@ -13,6 +13,9 @@ const MODEL_CANDIDATES = [
 const REDACT_NAMES = true;          // Mask StudentName inside prompts
 const MAX_OUTPUT_TOKENS = 256;      // Keep small for reliability
 const CANONICALISE_SUPPORT = false; // Preserve personalised support from the model
+const EMAIL_STAFF_ON_CREATE = true; // Email QA staff when files are created
+const QA_EMAIL = 'staff.member@school.org';
+const EMAIL_USE_NOREPLY = true;
 const LOCK_WAIT_MS = 5000;          // Faster response for low-concurrency schools
 const AUTO_EXPORT_PDF = true;       // Save PDF copy beside generated Doc
 const EMAIL_STAFF_ON_CREATE = true; // Email creator link to finished files when possible
@@ -148,6 +151,10 @@ function onFormSubmit(e) {
     EXPECTED_KEYS.forEach(k => body.replaceText(`\\{\\{${escRe(k)}\\}\\}`, '—')); // ensure no {{Missing}}
     doc.saveAndClose();
 
+    if (EMAIL_STAFF_ON_CREATE && QA_EMAIL) {
+      const folderUrl = parentFolder.getUrl();
+      MailApp.sendEmail({
+        to: QA_EMAIL,
     if (AUTO_EXPORT_PDF) {
       const pdfBlob = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(`${baseName}.pdf`);
       parentFolder.createFile(pdfBlob);
@@ -164,6 +171,8 @@ function onFormSubmit(e) {
            <p><strong>Student:</strong> ${safeStudentName}<br/>
            <strong>Google Doc:</strong> <a href="${doc.getUrl()}">${baseName}</a><br/>
            <strong>Drive folder:</strong> <a href="${folderUrl}">Open folder</a><br/>
+           <strong>PDF:</strong> Not generated.</p>`,
+        noReply: EMAIL_USE_NOREPLY
            <strong>PDF:</strong> ${AUTO_EXPORT_PDF ? `Saved as <em>${pdfName}</em> in the same folder.` : 'Not generated.'}</p>`
       });
     }
