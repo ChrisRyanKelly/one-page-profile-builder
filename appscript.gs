@@ -13,19 +13,18 @@ const MODEL_CANDIDATES = [
 const REDACT_NAMES = true;          // Mask StudentName inside prompts
 const MAX_OUTPUT_TOKENS = 256;      // Keep small for reliability
 const CANONICALISE_SUPPORT = false; // Preserve personalised support from the model
-const EMAIL_STAFF_ON_CREATE = true; // Email QA staff when files are created
+const EMAIL_STAFF_ON_CREATE = true; // Email QA staff and submitting staff when files are created
 const QA_EMAIL = 'staff.member@school.org';
 const EMAIL_USE_NOREPLY = true;
 const LOCK_WAIT_MS = 5000;          // Faster response for low-concurrency schools
 const AUTO_EXPORT_PDF = true;       // Save PDF copy beside generated Doc
-const EMAIL_STAFF_ON_CREATE = true; // Email creator link to finished files when possible
 /***** END CONFIG *****/
 
 const EXPECTED_KEYS = ['StudentName','YearGroup','AboutMe','IWishMyTeacherKnew','HowToSupportMe','ProfileDate'];
 
 const TARGET_SUPPORT = [
   'Give brief written and verbal instructions; highlight the key steps/success criteria.',
-  'Check in discreetly during independent work (“Are you on track?”).',
+  'Check in discreetly during independent work ("Are you on track?").',
   'Offer a quick private check before I start a task.',
   'Let me use a low-key help signal (e.g., small desk card) instead of a raised hand.',
   'Break tasks into smaller chunks with mini-deadlines.',
@@ -73,7 +72,7 @@ function onFormSubmit(e) {
     const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const clean = v => {
       const t = String(v ?? '').replace(/<[^>]+>/g, '').trim();
-      return t === '' ? '—' : t;
+      return t === '' ? '\u2014' : t;
     };
     const data = {};
     const rawByHeader = {};
@@ -81,7 +80,7 @@ function onFormSubmit(e) {
     headers.forEach((h, i) => {
       const k = toKey(h);
       rawByHeader[h] = values[i] == null ? '' : String(values[i]);
-      if (seen.has(k) && clean(values[i]) !== '—' && clean(values[seen.get(k)]) !== '—') {
+      if (seen.has(k) && clean(values[i]) !== '\u2014' && clean(values[seen.get(k)]) !== '\u2014') {
         console.warn(`Header collision on key "${k}" from "${h}" and "${headers[seen.get(k)]}".`);
       }
       seen.set(k, i);
@@ -106,8 +105,8 @@ function onFormSubmit(e) {
       const summary  = generateProfileSummary_(rawInputs, yearGroup, studentName);
       const polished = polishToSLTStyle_(summary);
 
-      data['AboutMe']            = polished.aboutMe || data['AboutMe'] || '—';
-      data['IWishMyTeacherKnew'] = polished.iWishMyTeacherKnew || data['IWishMyTeacherKnew'] || '—';
+      data['AboutMe']            = polished.aboutMe || data['AboutMe'] || '\u2014';
+      data['IWishMyTeacherKnew'] = polished.iWishMyTeacherKnew || data['IWishMyTeacherKnew'] || '\u2014';
       supportLines               = Array.isArray(polished.howToSupportMe) ? polished.howToSupportMe : [];
       data['HowToSupportMe']     = composeSupportParagraph_(supportLines);
 
@@ -116,17 +115,17 @@ function onFormSubmit(e) {
       const tidy = s => String(s || '')
         .replace(/\bweekends\b/gi, 'the weekend')
         .replace(/\bfavorite\b/gi, 'favourite')
-        .replace(/\bI am\b/g, 'I’m')
-        .replace(/\bI do not\b/g, 'I don’t')
+        .replace(/\bI am\b/g, 'I\u2019m')
+        .replace(/\bI do not\b/g, 'I don\u2019t')
         .replace(/\s+/g, ' ')
         .trim();
 
       data['AboutMe'] = rawInputs.aboutMe
         ? tidy(rawInputs.aboutMe)
-        : 'I enjoy my lessons and work best when I know exactly what I’m meant to do. I’ve got a good group of friends and I try my best in class.';
+        : 'I enjoy my lessons and work best when I know exactly what I\u2019m meant to do. I\u2019ve got a good group of friends and I try my best in class.';
       data['IWishMyTeacherKnew'] = rawInputs.iWishMyTeacherKnew
         ? tidy(rawInputs.iWishMyTeacherKnew) + (/[.!?]$/.test(rawInputs.iWishMyTeacherKnew) ? '' : '.')
-        : 'Sometimes I’m not sure what we’re supposed to be doing and I feel nervous about asking for help. I find it easier when instructions are clear and I can check privately that I’m on the right track.';
+        : 'Sometimes I\u2019m not sure what we\u2019re supposed to be doing and I feel nervous about asking for help. I find it easier when instructions are clear and I can check privately that I\u2019m on the right track.';
       supportLines = TARGET_SUPPORT.slice();
       data['HowToSupportMe'] = composeSupportParagraph_(supportLines);
     }
@@ -148,16 +147,26 @@ function onFormSubmit(e) {
     Object.keys(data).forEach(k => {
       body.replaceText(`\\{\\{${escRe(k)}\\}\\}`, clean(data[k]));
     });
-    EXPECTED_KEYS.forEach(k => body.replaceText(`\\{\\{${escRe(k)}\\}\\}`, '—')); // ensure no {{Missing}}
+    EXPECTED_KEYS.forEach(k => body.replaceText(`\\{\\{${escRe(k)}\\}\\}`, '\u2014')); // ensure no {{Missing}}
     doc.saveAndClose();
+
+    if (AUTO_EXPORT_PDF) {
+      const pdfBlob = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(`${baseName}.pdf`);
+      parentFolder.createFile(pdfBlob);
+    }
 
     if (EMAIL_STAFF_ON_CREATE && QA_EMAIL) {
       const folderUrl = parentFolder.getUrl();
       MailApp.sendEmail({
         to: QA_EMAIL,
-    if (AUTO_EXPORT_PDF) {
-      const pdfBlob = DriveApp.getFileById(doc.getId()).getAs(MimeType.PDF).setName(`${baseName}.pdf`);
-      parentFolder.createFile(pdfBlob);
+        subject: `New One Page Profile created: ${safeStudentName}`,
+        htmlBody:
+          `<p>A new One Page Profile has been created and is ready for QA review.</p>
+           <p><strong>Student:</strong> ${safeStudentName}<br/>
+           <strong>Google Doc:</strong> <a href="${doc.getUrl()}">${baseName}</a><br/>
+           <strong>Drive folder:</strong> <a href="${folderUrl}">Open folder</a></p>`,
+        noReply: EMAIL_USE_NOREPLY
+      });
     }
 
     if (EMAIL_STAFF_ON_CREATE && staffEmail) {
@@ -171,9 +180,8 @@ function onFormSubmit(e) {
            <p><strong>Student:</strong> ${safeStudentName}<br/>
            <strong>Google Doc:</strong> <a href="${doc.getUrl()}">${baseName}</a><br/>
            <strong>Drive folder:</strong> <a href="${folderUrl}">Open folder</a><br/>
-           <strong>PDF:</strong> Not generated.</p>`,
+           <strong>PDF:</strong> ${AUTO_EXPORT_PDF ? `Saved as <em>${pdfName}</em> in the same folder.` : 'Not generated.'}</p>`,
         noReply: EMAIL_USE_NOREPLY
-           <strong>PDF:</strong> ${AUTO_EXPORT_PDF ? `Saved as <em>${pdfName}</em> in the same folder.` : 'Not generated.'}</p>`
       });
     }
 
@@ -197,12 +205,12 @@ function generateProfileSummary_(raw, yearGroup, studentName) {
     role: "system",
     parts: [{ text:
 `You assist a UK school ALN/SEND coordinator. Use clear, professional UK English.
-Strictly output JSON that matches the schema—no extra prose.
+Strictly output JSON that matches the schema\u2014no extra prose.
 Tone: warm, concise, student-centred. No diagnoses or medical claims.
 Field styles:
-• aboutMe: first person ("I ..."), ~70–120 words; use UK spellings and "at the weekend".
-• iWishMyTeacherKnew: first person, ~40–90 words; emphasise clarity and discreet support.
-• howToSupportMe: 4–5 items, each a plain sentence (no numbering, no quotes).` }]
+\u2022 aboutMe: first person ("I ..."), ~70\u2013120 words; use UK spellings and "at the weekend".
+\u2022 iWishMyTeacherKnew: first person, ~40\u201390 words; emphasise clarity and discreet support.
+\u2022 howToSupportMe: 4\u20135 items, each a plain sentence (no numbering, no quotes).` }]
   };
 
   const responseSchema = {
@@ -218,14 +226,14 @@ Field styles:
 
   const styleExample = `
 About Me:
-I live with my mum and dad and I enjoy playing football at the weekend. In school, my favourite lesson is English. I’ve got a good group of friends and I work well with them. I can be quiet at first, but I try my best and I like knowing exactly what I’m meant to do.
+I live with my mum and dad and I enjoy playing football at the weekend. In school, my favourite lesson is English. I\u2019ve got a good group of friends and I work well with them. I can be quiet at first, but I try my best and I like knowing exactly what I\u2019m meant to do.
 
 I Wish My Teacher Knew:
-Sometimes I’m not sure what we’re supposed to be doing and I feel nervous about asking for help. I find it easier when instructions are clear and I can check privately that I’m on the right track.
+Sometimes I\u2019m not sure what we\u2019re supposed to be doing and I feel nervous about asking for help. I find it easier when instructions are clear and I can check privately that I\u2019m on the right track.
 
 How to Support Me items (examples):
 Give brief written and verbal instructions; highlight the key steps/success criteria.
-Check in discreetly during independent work (“Are you on track?”).
+Check in discreetly during independent work (\u201cAre you on track?\u201d).
 Let me use a low-key help signal (e.g., small desk card) instead of a raised hand.
 Use visuals/models to show what good work looks like.
 `;
@@ -303,18 +311,18 @@ function polishToSLTStyle_(summary) {
     let t = s.aboutMe
       .replace(/\bweekends\b/gi, 'the weekend')
       .replace(/\bfavorite\b/gi, 'favourite')
-      .replace(/\bI have\b/gi, 'I’ve');
-    if (/I(’|'|`)ve got a good group of friends\b/i.test(t) && !/work well with them/i.test(t)) {
-      t = t.replace(/I(’|'|`)ve got a good group of friends\b/i, 'I’ve got a good group of friends and I work well with them');
+      .replace(/\bI have\b/gi, 'I\u2019ve');
+    if (/I(\u2019|'|`)ve got a good group of friends\b/i.test(t) && !/work well with them/i.test(t)) {
+      t = t.replace(/I(\u2019|'|`)ve got a good group of friends\b/i, 'I\u2019ve got a good group of friends and I work well with them');
     }
     s.aboutMe = tidySentences_(t);
   }
 
   if (s.iWishMyTeacherKnew) {
     let t = s.iWishMyTeacherKnew
-      .replace(/\bI am\b/g, 'I’m')
-      .replace(/\bI do not\b/g, 'I don’t')
-      .replace(/\bsupposed to be doing\b/gi, 'what we’re supposed to be doing')
+      .replace(/\bI am\b/g, 'I\u2019m')
+      .replace(/\bI do not\b/g, 'I don\u2019t')
+      .replace(/\bsupposed to be doing\b/gi, 'what we\u2019re supposed to be doing')
       .replace(/\bafraid to ask for help\b/gi, 'nervous about asking for help')
       .trim();
     s.iWishMyTeacherKnew = tidySentences_(dedupeSentences_(t));
@@ -329,7 +337,7 @@ function polishToSLTStyle_(summary) {
 
 function composeSupportParagraph_(items) {
   const list = dedupeKeepOrder_((items || []).map(tidySentence_)).slice(0, 5);
-  return list.length ? tidySentences_(list.join(' ')) : '—';
+  return list.length ? tidySentences_(list.join(' ')) : '\u2014';
 }
 
 /** === Minimal resilience: retry only when it helps === **/
@@ -368,7 +376,7 @@ function withRetry_(fn, opts = {}) {
 function tidySentence_(s) {
   let t = String(s || '').trim().replace(/\s+/g, ' ');
   if (!t) return '';
-  if (!/[.!?]["’"]?$/.test(t)) t += '.';
+  if (!/[.!?]["'\u2019]?$/.test(t)) t += '.';
   return t;
 }
 function tidySentences_(s) {
